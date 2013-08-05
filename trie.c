@@ -36,6 +36,27 @@ trie_free(Trie *trie)
     }
 }
 
+static Trie *
+trie_create(Trie *trie, const char *key)
+{
+    const size_t key_len = strlen(key);
+    Trie *node = trie;
+    if (0 == key_len) {
+        ++node->count;
+    } else {
+        for (unsigned long i = 0; i < key_len; ++i) {
+            const int code = (int)key[i];
+            if (!node->children[code]) {
+                node->children[code] = trie_new();
+                node->children[code]->c = (char)code;
+            }
+            ++node->count;
+            node = node->children[code];
+        }
+    }
+    return node;
+}
+
 static Trie*
 trie_search(Trie* trie, const char *key)
 {
@@ -94,24 +115,8 @@ trie_store(VALUE self, VALUE key, VALUE value)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
-    const char *key_str = StringValuePtr(key);
-    const size_t key_len = strlen(key_str);
-    if (0 == key_len) {
-        ++trie->count;
-        trie->value = value;
-    } else {
-        Trie *node = trie;
-        for (unsigned long i = 0; i < key_len; ++i) {
-            const int code = (int)key_str[i];
-            if (!node->children[code]) {
-                node->children[code] = trie_new();
-                node->children[code]->c = (char)code;
-            }
-            ++node->count;
-            node = node->children[code];
-        }
-        node->value = value;
-    }
+    Trie *node = trie_create(trie, StringValuePtr(key));
+    node->value = value;
     return value;
 }
 
