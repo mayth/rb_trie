@@ -32,7 +32,7 @@ trie_free(Trie *trie)
         for (unsigned int i = 0; i < NUM_CHILDREN; ++i) {
             trie_free(trie->children[i]);
         }
-        free(trie);
+        ruby_xfree(trie);
     }
 }
 
@@ -143,7 +143,7 @@ trie_each(VALUE self)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
-    Trie **result = (Trie **)malloc(sizeof(Trie *) * trie->count);
+    Trie **result = ALLOC_N(Trie *, trie->count);
     for (unsigned long i = 0; i < trie->count; ++i) {
         result[i] = 0;
     }
@@ -151,7 +151,7 @@ trie_each(VALUE self)
     for (unsigned long i = 0; i < trie->count; ++i) {
         rb_yield(result[i]->value);
     }
-    free(result);
+    ruby_xfree(result);
     return self;
 }
 
@@ -175,7 +175,7 @@ trie_common_prefix_each(VALUE self, VALUE key)
     if (sub->value) {
         ++sub_count;
     }
-    Trie **result = (Trie **)malloc(sizeof(Trie *) * sub_count);
+    Trie **result = ALLOC_N(Trie *, sub_count);
     for (unsigned long i = 0; i < sub_count; ++i) {
         result[i] = NULL;
     }
@@ -183,7 +183,7 @@ trie_common_prefix_each(VALUE self, VALUE key)
     for (unsigned long i = 0; i < sub_count; ++i) {
         rb_yield(result[i]->value);
     }
-    free(result);
+    ruby_xfree(result);
     return self;
 }
 
