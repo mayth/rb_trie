@@ -6,8 +6,8 @@ typedef struct _trie Trie;
 
 struct _trie {
     char c;
-    unsigned long count;
-    Trie *children[NUM_CHILDREN];
+    Trie *next;
+    Trie *child;
     VALUE value;
 };
 
@@ -17,10 +17,8 @@ trie_new(void)
 {
     Trie *trie = ALLOC(Trie);
     trie->c = 0;
-    trie->count = 0;
-    for (int i = 0; i < NUM_CHILDREN; ++i) {
-        trie->children[i] = NULL;
-    }
+    trie->next = NULL;
+    trie->child = NULL;
     trie->value = 0;
     return trie;
 }
@@ -29,11 +27,34 @@ static void
 trie_free(Trie *trie)
 {
     if (trie) {
-        for (unsigned int i = 0; i < NUM_CHILDREN; ++i) {
-            trie_free(trie->children[i]);
+        if (trie->next) {
+            trie_free(trie->next);
+        }
+        if (trie->child) {
+            trie_free(trie->child);
         }
         ruby_xfree(trie);
     }
+}
+
+static Trie *
+trie_add_child(Trie *trie, Trie *child)
+{
+    if (trie->child) {
+        child->next = trie->child;
+        trie->child = child;
+    } else {
+        trie->child = child;
+    }
+    return child;
+}
+
+static Trie *
+trie_find(Trie *start, const char key)
+{
+    Trie *node;
+    for (node = start; node != NULL && node->c != key; node = node->next);
+    return node;
 }
 
 static Trie *
@@ -41,17 +62,12 @@ trie_create(Trie *trie, const char *key)
 {
     const size_t key_len = strlen(key);
     Trie *node = trie;
-    if (0 == key_len) {
-        ++node->count;
-    } else {
-        for (unsigned long i = 0; i < key_len; ++i) {
-            const int code = (int)key[i];
-            if (!node->children[code]) {
-                node->children[code] = trie_new();
-                node->children[code]->c = (char)code;
-            }
-            ++node->count;
-            node = node->children[code];
+    for (unsigned long i = 0; i < key_len; ++i) {
+        const char k = key[i];
+        node = trie_find(node->child, k);
+        if (!node) {
+            node = trie_add_child(node, trie_new());
+            node->c = k;
         }
     }
     return node;
@@ -63,13 +79,11 @@ trie_search(Trie* trie, const char *key)
     Trie *node = trie;
     const size_t key_len = strlen(key);
     for (unsigned long i = 0; i < key_len; ++i) {
-        const int code = (int)key[i];
-        if (!node->children[code]) {
+        node = trie_find(node, key[i]);
+        if (!node) {
             return NULL;
         }
-        node = node->children[code];
     }
-    // node is found but it is not assigned.
     return node;
 }
 
