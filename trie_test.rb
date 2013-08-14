@@ -1,4 +1,4 @@
-require 'trie'
+require './trie'
 
 t = Trie.new
 
@@ -11,8 +11,8 @@ p t.get('xyz')
 p t['abcd']
 puts "num of items: #{t.size}"
 puts '** each'
-t.each do |val|
-  puts val
+t.each do |k, v|
+  puts "#{k}: #{v}"
 end
 
 puts '** each with index'
