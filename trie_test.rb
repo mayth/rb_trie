@@ -36,6 +36,14 @@ class TestTrie < MiniTest::Unit::TestCase
     assert_nil @trie['0123']
   end
 
+  def test_delete
+    @trie['abc'] = 100
+    assert_equal 1, @trie.size
+    assert_equal 100, @trie.delete('abc')
+    assert_equal 0, @trie.size
+    assert_nil @trie['abc']
+  end
+
   def test_size
     @trie['abc'] = 'xyz'
     @trie['mof'] = 'alpaca'

@@ -204,6 +204,31 @@ trie_get(VALUE self, VALUE key)
 }
 
 /***
+ * Trie#delete(key) -> object | nil
+ * Trie#delete(key) {|key| ... } -> object
+ * Deletes an element associated with the given key.
+ * Returns a value of the element associated with the given key if the element is found;
+ * otherwise, returns nil, but if a block is given, returns a return value of the block instead.
+***/
+static VALUE
+trie_delete(VALUE self, VALUE key)
+{
+    Trie *trie;
+    Data_Get_Struct(self, Trie, trie);
+    const char *key_str = StringValuePtr(key);
+    Trie *result = trie_search_leaf(trie, key_str);
+    if (!result) {
+        if (rb_block_given_p()) {
+            return rb_yield(key);
+        }
+        return Qnil;
+    }
+    VALUE val = result->value;
+    result->value = 0;
+    return val;
+}
+
+/***
  * Trie#each { |value| ... }
  * Evaluates the given block with the values in this tree.
  * The order of evaluation is dictionary order.
@@ -251,7 +276,6 @@ trie_size(VALUE self)
     return ULONG2NUM(trie_count(trie));
 }
 
-
 void
 Init_trie(void)
 {
@@ -262,6 +286,7 @@ Init_trie(void)
     rb_define_method(cTrie, "[]=", trie_store, 2);
     rb_define_method(cTrie, "get", trie_get, 1);
     rb_define_method(cTrie, "[]", trie_get, 1);
+    rb_define_method(cTrie, "delete", trie_delete, 1);
     rb_define_method(cTrie, "each", trie_each, 0);
     rb_define_method(cTrie, "common_prefix_each", trie_common_prefix_each, 1);
     rb_define_method(cTrie, "size", trie_size, 0);
