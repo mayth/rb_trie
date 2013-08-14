@@ -141,9 +141,6 @@ trie_count(Trie *trie)
     if (trie->value) {
         ++count;
     }
-    for (Trie *node = trie->next; node != NULL; node = node->next) {
-        count += trie_count(node);
-    }
     for (Trie *node = trie->child; node != NULL; node = node->next) {
         count += trie_count(node);
     }
