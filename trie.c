@@ -91,6 +91,9 @@ trie_search(Trie* trie, const char *key)
         } else {
             node = trie_find(node->child, k);
         }
+        if (!node) {
+            return NULL;
+        }
     }
     return node;
 }
