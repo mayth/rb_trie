@@ -1,27 +1,47 @@
+require 'minitest/unit'
 require './trie'
 
-t = Trie.new
+MiniTest::Unit.autorun
 
-t.store('abc', {a: 10, b: 20, c: 30})
-p t.get('abc')
-p t.get('abcd')
-t.store('xyz', 'mof')
-t['abcd'] = 'alpaca'
-p t.get('xyz')
-p t['abcd']
-puts "num of items: #{t.size}"
-puts '** each'
-t.each do |k, v|
-  puts "#{k}: #{v}"
-end
+class TestTrie < MiniTest::Unit::TestCase
+  def setup
+    @trie = Trie.new
+  end
 
-puts '** each with index'
-t.each_with_index do |val, idx|
-  puts "#{idx}: #{val}"
-end
+  def test_store
+    k = 'abc'
+    v = {a: 10, b: 20, c: 30}
+    assert_equal v, @trie.store(k, v)
+  end
 
-puts '**common prefix: abc'
-t.common_prefix_each('abc') do |val|
-  puts val
+  def test_store_op
+    k = 'abc'
+    v = {a: 10, b: 20, c: 30}
+    assert_equal v, @trie[k] = v
+  end
+
+  def test_get
+    k = 'abc'
+    v = {a: 10, b: 20, c: 30}
+    @trie.store(k, v)
+    assert_equal v, @trie.get(k)
+    assert_nil @trie.get('0123')
+  end
+
+  def test_get_op
+    k = 'abc'
+    v = {a: 10, b: 20, c: 30}
+    @trie.store(k, v)
+    assert_equal v, @trie[k]
+    assert_nil @trie['0123']
+  end
+
+  def test_size
+    @trie['abc'] = 'xyz'
+    @trie['mof'] = 'alpaca'
+    @trie['lilium'] = 'ambient'
+    assert_equal 3, @trie.size
+    assert_equal 3, @trie.length
+  end
 end
 
