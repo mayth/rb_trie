@@ -4,177 +4,262 @@
 #define INITIAL_STR_LEN 32
 #define INCREMENT_STR_LEN 32
 
+#define IS_MODIFIABLE(trie) (0 == trie->traversing)
+
 typedef struct _trie Trie;
+typedef struct _trienode TrieNode;
+
 struct _trie {
+    TrieNode *root;
+    int traversing;
+};
+
+struct _trienode {
     char c;
-    Trie *next;
-    Trie *child;
+    TrieNode *next;
+    TrieNode *child;
     VALUE value;
 };
 
-typedef VALUE (*TRAVERSE_FUNC)(const Trie *node);
-typedef VALUE (*TRAVERSE_WITH_KEY_FUNC)(const Trie *node, const char *key);
+typedef VALUE (*TRAVERSE_FUNC)(const TrieNode *node);
+typedef VALUE (*TRAVERSE_WITH_KEY_FUNC)(const TrieNode *node, const char *key);
 
 /***** Trie Operation *****/
-static Trie*
-trie_new(void)
+static TrieNode *
+trienode_new(void)
 {
-    Trie *trie = ALLOC(Trie);
-    trie->c = 0;
-    trie->next = NULL;
-    trie->child = NULL;
-    trie->value = 0;
-    return trie;
+    TrieNode *node = ALLOC(TrieNode);
+    node->c = 0;
+    node->next = NULL;
+    node->child = NULL;
+    node->value = 0;
+    return node;
 }
 
 static void
-trie_free(Trie *trie)
+trienode_free(TrieNode *node)
 {
-    if (trie) {
-        if (trie->next) {
-            trie_free(trie->next);
+    if (node) {
+        if (node->next) {
+            trienode_free(node->next);
         }
-        if (trie->child) {
-            trie_free(trie->child);
+        if (node->child) {
+            trienode_free(node->child);
         }
-        ruby_xfree(trie);
+        ruby_xfree(node);
     }
 }
 
-static Trie *
-trie_add_child(Trie *trie, Trie *child)
+static TrieNode *
+trienode_add_child(TrieNode *node, TrieNode *child)
 {
-    if (trie->child) {
-        child->next = trie->child;
-        trie->child = child;
+    if (node->child) {
+        child->next = node->child;
+        node->child = child;
     } else {
-        trie->child = child;
+        node->child = child;
     }
     return child;
 }
 
-static Trie *
-trie_find(Trie *start, const char key)
+static TrieNode *
+trienode_find(TrieNode *start, const char key)
 {
-    Trie *node;
-    for (node = start; node != NULL && node->c != key; node = node->next);
-    return node;
+    TrieNode *p;
+    for (p = start; p != NULL && p->c != key; p = p->next);
+    return p;
 }
 
-static Trie *
-trie_create(Trie *trie, const char *key)
+static TrieNode *
+trienode_create(TrieNode *node, const char *key)
 {
     const size_t key_len = strlen(key);
-    Trie *node = trie;
+    TrieNode *p = node;
     for (size_t i = 0; i < key_len; ++i) {
         const char k = key[i];
-        Trie *child = trie_find(node->child, k);
+        TrieNode *child = trienode_find(p->child, k);
         if (!child) {
-            child = trie_new();
+            child = trienode_new();
             child->c = k;
-            trie_add_child(node, child);
+            trienode_add_child(p, child);
         }
-        node = child;
+        p = child;
     }
-    return node;
+    return p;
 }
 
-static Trie*
-trie_search(Trie* trie, const char *key)
+static TrieNode *
+trienode_search(TrieNode* node, const char *key)
 {
-    Trie *node = trie;
+    TrieNode *p = node;
     const size_t key_len = strlen(key);
     for (size_t i = 0; i < key_len; ++i) {
         const char k = key[i];
-        if (node->c == k) {
-            node = trie_find(node->next, k);
+        if (p->c == k) {
+            p = trienode_find(p->next, k);
         } else {
-            node = trie_find(node->child, k);
+            p = trienode_find(p->child, k);
         }
-        if (!node) {
+        if (!p) {
             return NULL;
         }
     }
-    return node;
+    return p;
 }
 
-static Trie*
-trie_search_leaf(Trie* trie, const char *key)
+static TrieNode *
+trienode_search_leaf(TrieNode* node, const char *key)
 {
-    Trie* result = trie_search(trie, key);
+    TrieNode *result = trienode_search(node, key);
     if (!result || !result->value)
         return NULL;
     return result;
 }
 
 static void
-trie_traverse(Trie* trie, TRAVERSE_FUNC func)
+trienode_traverse(TrieNode* node, TRAVERSE_FUNC func)
 {
-    if (trie) {
-        if (trie->value) {
-            func(trie);
+    if (node) {
+        if (node->value) {
+            func(node);
         }
-        for (Trie *node = trie->child; node != NULL; node = node->next) {
-            trie_traverse(node, func);
+        for (TrieNode *p = node->child; p != NULL; p = p->next) {
+            trienode_traverse(p, func);
         }
     }
 }
 
 static void
-trie_traverse_with_key(Trie *trie, const char *key, TRAVERSE_WITH_KEY_FUNC func)
+trienode_traverse_with_key(TrieNode *node, const char *key, TRAVERSE_WITH_KEY_FUNC func)
 {
-    if (trie) {
+    if (node) {
         const size_t key_len = strlen(key);
         char *tmp_key = ALLOC_N(char, key_len + 2);
         strcpy(tmp_key, key);
-        tmp_key[key_len] = trie->c;
+        tmp_key[key_len] = node->c;
         tmp_key[key_len+1] = '\0';
-        if (trie->value) {
-            func(trie, tmp_key);
+        if (node->value) {
+            func(node, tmp_key);
         }
-        for (Trie *node = trie->child; node != NULL; node = node->next) {
-            trie_traverse_with_key(node, tmp_key, func);
+        for (TrieNode *p = node->child; p != NULL; p = p->next) {
+            trienode_traverse_with_key(p, tmp_key, func);
         }
         ruby_xfree(tmp_key);
     }
 }
 
 static unsigned long
-trie_count(Trie *trie)
+trienode_count(TrieNode *node)
 {
     unsigned long count = 0;
-    if (trie->value) {
+    if (node->value) {
         ++count;
     }
-    for (Trie *node = trie->child; node != NULL; node = node->next) {
-        count += trie_count(node);
+    for (TrieNode *p = node->child; p != NULL; p = p->next) {
+        count += trienode_count(p);
     }
     return count;
 }
 
 /***** Helper function *****/
 static VALUE
-trie_traverse_value_func(const Trie *node)
+trie_traverse_value_func(const TrieNode *node)
 {
     return rb_yield(node->value);
 }
 
 static VALUE
-trie_traverse_key_func(const Trie *node, const char* key)
+trie_traverse_key_func(const TrieNode *node, const char* key)
 {
     return rb_yield(rb_str_new2(key));
 }
 
 static VALUE
-trie_traverse_value_with_key_func(const Trie *node, const char* key)
+trie_traverse_value_with_key_func(const TrieNode *node, const char* key)
 {
     return rb_yield(rb_ary_new3(2, rb_str_new2(key), node->value));
+}
+
+/***** Trie Operation *****/
+static Trie *
+trie_new(void)
+{
+    Trie *trie = ALLOC(Trie);
+    trie->root = trienode_new();
+    return trie;
+}
+
+static void
+trie_free(Trie *trie)
+{
+    if (trie && trie->root) {
+        trienode_free(trie->root);
+    }
+}
+
+static void
+trie_store(Trie *trie, const char *key, VALUE value)
+{
+    if (IS_MODIFIABLE(trie)) {
+        TrieNode *node = trienode_create(trie->root, key);
+        node->value = value;
+    }
+}
+
+static TrieNode *
+trie_search(Trie *trie, const char *key)
+{
+    return trienode_search(trie->root, key);
+}
+
+static TrieNode *
+trie_search_leaf(Trie *trie, const char *key)
+{
+    return trienode_search_leaf(trie->root, key);
+}
+
+static void
+trie_traverse_with_key(Trie *trie, char *key, TRAVERSE_WITH_KEY_FUNC func)
+{
+    ++trie->traversing;
+    trienode_traverse_with_key(trie->root, key, func);
+    --trie->traversing;
+}
+
+static void
+trie_traverse(Trie *trie, TRAVERSE_FUNC func)
+{
+    ++trie->traversing;
+    trienode_traverse(trie->root, func);
+    --trie->traversing;
+}
+
+static void
+trie_common_prefix_traverse(Trie *trie, char *prefix, TRAVERSE_WITH_KEY_FUNC func)
+{
+    char* sub_prefix;
+    size_t len;
+    TrieNode *sub = trie_search(trie, prefix);
+    if (!sub) {
+        return;
+    }
+    len = strlen(prefix);
+    sub_prefix = ALLOC_N(char, len);
+    strncpy(sub_prefix, prefix, len - 1);
+    trienode_traverse_with_key(sub, sub_prefix, func);
+    ruby_xfree(sub_prefix);
+}
+
+static unsigned long
+trie_count(Trie *trie)
+{
+    return trienode_count(trie->root);
 }
 
 /***** Ruby Method Implementation *****/
 /*** Allocation function ***/
 static VALUE
-trie_alloc(VALUE self)
+rb_trie_alloc(VALUE self)
 {
     return Data_Wrap_Struct(self, 0, trie_free, trie_new());
 }
@@ -185,12 +270,11 @@ trie_alloc(VALUE self)
  * Returns *value*.
 ***/
 static VALUE
-trie_store(VALUE self, VALUE key, VALUE value)
+rb_trie_store(VALUE self, VALUE key, VALUE value)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
-    Trie *node = trie_create(trie, StringValuePtr(key));
-    node->value = value;
+    trie_store(trie, StringValuePtr(key), value);
     return value;
 }
 
@@ -200,12 +284,12 @@ trie_store(VALUE self, VALUE key, VALUE value)
  * Returns the value associated with *key* if found; otherwise, nil.
 ***/
 static VALUE
-trie_get(VALUE self, VALUE key)
+rb_trie_get(VALUE self, VALUE key)
 {
     Trie *trie;
+    TrieNode *result;
     Data_Get_Struct(self, Trie, trie);
-    const char *key_str = StringValuePtr(key);
-    Trie *result = trie_search_leaf(trie, key_str);
+    result = trie_search_leaf(trie, StringValuePtr(key));
     if (!result)
         return Qnil;
     return result->value;
@@ -219,19 +303,20 @@ trie_get(VALUE self, VALUE key)
  * otherwise, returns nil, but if a block is given, returns a return value of the block instead.
 ***/
 static VALUE
-trie_delete(VALUE self, VALUE key)
+rb_trie_delete(VALUE self, VALUE key)
 {
     Trie *trie;
+    TrieNode *result;
+    VALUE val;
     Data_Get_Struct(self, Trie, trie);
-    const char *key_str = StringValuePtr(key);
-    Trie *result = trie_search_leaf(trie, key_str);
+    result = trie_search_leaf(trie, StringValuePtr(key));
     if (!result) {
         if (rb_block_given_p()) {
             return rb_yield(key);
         }
         return Qnil;
     }
-    VALUE val = result->value;
+    val = result->value;
     result->value = 0;
     return val;
 }
@@ -243,7 +328,7 @@ trie_delete(VALUE self, VALUE key)
  * The block must be given.
 ***/
 static VALUE
-trie_each(VALUE self)
+rb_trie_each(VALUE self)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
@@ -252,7 +337,7 @@ trie_each(VALUE self)
 }
 
 static VALUE
-trie_each_key(VALUE self)
+rb_trie_each_key(VALUE self)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
@@ -261,7 +346,7 @@ trie_each_key(VALUE self)
 }
 
 static VALUE
-trie_each_value(VALUE self)
+rb_trie_each_value(VALUE self)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
@@ -276,21 +361,11 @@ trie_each_value(VALUE self)
  * The block must be given.
 ***/
 static VALUE
-trie_common_prefix_each(VALUE self, VALUE key)
+rb_trie_common_prefix_each(VALUE self, VALUE key)
 {
     Trie *trie;
-    char* prefix;
-    size_t len;
     Data_Get_Struct(self, Trie, trie);
-    Trie *sub = trie_search(trie, StringValuePtr(key));
-    if (!sub) {
-        return self;
-    }
-    len = RSTRING_LEN(key);
-    prefix = ALLOC_N(char, len);
-    strncpy(prefix, StringValuePtr(key), len - 1);
-    trie_traverse_with_key(sub, prefix, trie_traverse_value_with_key_func);
-    ruby_xfree(prefix);
+    trie_common_prefix_traverse(trie, StringValuePtr(key), trie_traverse_value_with_key_func);
     return self;
 }
 
@@ -300,7 +375,7 @@ trie_common_prefix_each(VALUE self, VALUE key)
  * Get the number of the elements in this tree.
 ***/
 static VALUE
-trie_size(VALUE self)
+rb_trie_size(VALUE self)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
@@ -312,18 +387,18 @@ Init_trie(void)
 {
     VALUE cTrie = rb_define_class("Trie", rb_cObject);
     rb_include_module(cTrie, rb_mEnumerable);
-    rb_define_alloc_func(cTrie, trie_alloc);
-    rb_define_method(cTrie, "store", trie_store, 2);
-    rb_define_method(cTrie, "[]=", trie_store, 2);
-    rb_define_method(cTrie, "get", trie_get, 1);
-    rb_define_method(cTrie, "[]", trie_get, 1);
-    rb_define_method(cTrie, "delete", trie_delete, 1);
-    rb_define_method(cTrie, "each", trie_each, 0);
-    rb_define_method(cTrie, "each_key", trie_each_key, 0);
-    rb_define_method(cTrie, "each_value", trie_each_value, 0);
-    rb_define_method(cTrie, "common_prefix_each", trie_common_prefix_each, 1);
-    rb_define_method(cTrie, "size", trie_size, 0);
-    rb_define_method(cTrie, "length", trie_size, 0);
+    rb_define_alloc_func(cTrie, rb_trie_alloc);
+    rb_define_method(cTrie, "store", rb_trie_store, 2);
+    rb_define_method(cTrie, "[]=", rb_trie_store, 2);
+    rb_define_method(cTrie, "get", rb_trie_get, 1);
+    rb_define_method(cTrie, "[]", rb_trie_get, 1);
+    rb_define_method(cTrie, "delete", rb_trie_delete, 1);
+    rb_define_method(cTrie, "each", rb_trie_each, 0);
+    rb_define_method(cTrie, "each_key", rb_trie_each_key, 0);
+    rb_define_method(cTrie, "each_value", rb_trie_each_value, 0);
+    rb_define_method(cTrie, "common_prefix_each", rb_trie_common_prefix_each, 1);
+    rb_define_method(cTrie, "size", rb_trie_size, 0);
+    rb_define_method(cTrie, "length", rb_trie_size, 0);
 }
 
 // vim: set expandtab ts=4 sw=4 sts=4:
