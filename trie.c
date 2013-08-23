@@ -182,10 +182,9 @@ trie_traverse_value_with_key_func(const TrieNode *node, const char* key)
 
 /***** Trie Operation *****/
 static Trie *
-trie_new(void)
+trie_alloc(void)
 {
     Trie *trie = ALLOC(Trie);
-    trie->root = trienode_new();
     return trie;
 }
 
@@ -261,7 +260,22 @@ trie_count(Trie *trie)
 static VALUE
 rb_trie_alloc(VALUE self)
 {
-    return Data_Wrap_Struct(self, 0, trie_free, trie_new());
+    return Data_Wrap_Struct(self, 0, trie_free, trie_alloc());
+}
+
+/***
+ * Trie#initialize
+ *
+ * Initializes a new instance of Trie class.
+***/
+static VALUE
+rb_trie_initialize(VALUE self)
+{
+    Trie *trie;
+    Data_Get_Struct(self, Trie, trie);
+    trie->root = trienode_new();
+    trie->traversing = 0;
+    return Qnil;
 }
 
 /***
@@ -388,6 +402,7 @@ Init_trie(void)
     VALUE cTrie = rb_define_class("Trie", rb_cObject);
     rb_include_module(cTrie, rb_mEnumerable);
     rb_define_alloc_func(cTrie, rb_trie_alloc);
+    rb_define_private_method(cTrie, "initialize", rb_trie_initialize, 0);
     rb_define_method(cTrie, "store", rb_trie_store, 2);
     rb_define_method(cTrie, "[]=", rb_trie_store, 2);
     rb_define_method(cTrie, "get", rb_trie_get, 1);
