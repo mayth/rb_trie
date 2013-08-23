@@ -128,12 +128,14 @@ trie_traverse_with_key(Trie *trie, const char *key, TRAVERSE_WITH_KEY_FUNC func)
         char *tmp_key = ALLOC_N(char, key_len + 2);
         strcpy(tmp_key, key);
         tmp_key[key_len] = trie->c;
+        tmp_key[key_len+1] = '\0';
         if (trie->value) {
             func(trie, tmp_key);
         }
         for (Trie *node = trie->child; node != NULL; node = node->next) {
             trie_traverse_with_key(node, tmp_key, func);
         }
+        ruby_xfree(tmp_key);
     }
 }
 
@@ -152,13 +154,19 @@ trie_count(Trie *trie)
 
 /***** Helper function *****/
 static VALUE
-trie_traverse_func(const Trie *node)
+trie_traverse_value_func(const Trie *node)
 {
     return rb_yield(node->value);
 }
 
 static VALUE
-trie_traverse_with_key_func(const Trie *node, const char* key)
+trie_traverse_key_func(const Trie *node, const char* key)
+{
+    return rb_yield(rb_str_new2(key));
+}
+
+static VALUE
+trie_traverse_value_with_key_func(const Trie *node, const char* key)
 {
     return rb_yield(rb_ary_new3(2, rb_str_new2(key), node->value));
 }
@@ -239,7 +247,25 @@ trie_each(VALUE self)
 {
     Trie *trie;
     Data_Get_Struct(self, Trie, trie);
-    trie_traverse_with_key(trie, "", trie_traverse_with_key_func);
+    trie_traverse_with_key(trie, "", trie_traverse_value_with_key_func);
+    return self;
+}
+
+static VALUE
+trie_each_key(VALUE self)
+{
+    Trie *trie;
+    Data_Get_Struct(self, Trie, trie);
+    trie_traverse_with_key(trie, "", trie_traverse_key_func);
+    return self;
+}
+
+static VALUE
+trie_each_value(VALUE self)
+{
+    Trie *trie;
+    Data_Get_Struct(self, Trie, trie);
+    trie_traverse(trie, trie_traverse_value_func);
     return self;
 }
 
@@ -253,13 +279,18 @@ static VALUE
 trie_common_prefix_each(VALUE self, VALUE key)
 {
     Trie *trie;
+    char* prefix;
+    size_t len;
     Data_Get_Struct(self, Trie, trie);
-    const char* key_str = StringValuePtr(key);
-    Trie *sub = trie_search(trie, key_str);
+    Trie *sub = trie_search(trie, StringValuePtr(key));
     if (!sub) {
         return self;
     }
-    trie_traverse(sub, trie_traverse_func);
+    len = RSTRING_LEN(key);
+    prefix = ALLOC_N(char, len);
+    strncpy(prefix, StringValuePtr(key), len - 1);
+    trie_traverse_with_key(sub, prefix, trie_traverse_value_with_key_func);
+    ruby_xfree(prefix);
     return self;
 }
 
@@ -288,6 +319,8 @@ Init_trie(void)
     rb_define_method(cTrie, "[]", trie_get, 1);
     rb_define_method(cTrie, "delete", trie_delete, 1);
     rb_define_method(cTrie, "each", trie_each, 0);
+    rb_define_method(cTrie, "each_key", trie_each_key, 0);
+    rb_define_method(cTrie, "each_value", trie_each_value, 0);
     rb_define_method(cTrie, "common_prefix_each", trie_common_prefix_each, 1);
     rb_define_method(cTrie, "size", trie_size, 0);
     rb_define_method(cTrie, "length", trie_size, 0);
