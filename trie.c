@@ -263,6 +263,12 @@ rb_trie_alloc(VALUE self)
     return Data_Wrap_Struct(self, 0, trie_free, trie_alloc());
 }
 
+static void
+rb_trie_modify_check(VALUE obj)
+{
+    rb_check_frozen(obj);
+}
+
 /***
  * Trie#initialize
  *
@@ -287,6 +293,7 @@ static VALUE
 rb_trie_store(VALUE self, VALUE key, VALUE value)
 {
     Trie *trie;
+    rb_trie_modify_check(self);
     Data_Get_Struct(self, Trie, trie);
     trie_store(trie, StringValuePtr(key), value);
     return value;
@@ -396,6 +403,12 @@ rb_trie_size(VALUE self)
     return ULONG2NUM(trie_count(trie));
 }
 
+static VALUE
+rb_trie_freeze(VALUE self)
+{
+    return rb_obj_freeze(self);
+}
+
 void
 Init_trie(void)
 {
@@ -414,6 +427,7 @@ Init_trie(void)
     rb_define_method(cTrie, "common_prefix_each", rb_trie_common_prefix_each, 1);
     rb_define_method(cTrie, "size", rb_trie_size, 0);
     rb_define_method(cTrie, "length", rb_trie_size, 0);
+    rb_define_method(cTrie, "freeze", rb_trie_freeze, 0);
 }
 
 // vim: set expandtab ts=4 sw=4 sts=4:

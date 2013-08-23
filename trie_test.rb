@@ -51,5 +51,13 @@ class TestTrie < MiniTest::Unit::TestCase
     assert_equal 3, @trie.size
     assert_equal 3, @trie.length
   end
+
+  def test_freeze
+    @trie['abc'] = 'xyz'
+    @trie.freeze
+    assert_raises RuntimeError do
+      @trie['def'] = 'mof'  # because of it is frozen.
+    end
+  end
 end
 
